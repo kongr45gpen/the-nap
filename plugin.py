@@ -31,6 +31,7 @@
 import supybot.utils as utils
 from supybot.commands import *
 import supybot.plugins as plugins
+import supybot.ircmsgs as ircmsgs
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
 try:
@@ -40,11 +41,52 @@ except ImportError:
     # Placeholder that allows to run the plugin on a bot
     # without the i18n module
     _ = lambda x: x
-
+from datetime import datetime, time
 
 class TheNap(callbacks.Plugin):
     """Tells the_map to go to sleep"""
-    pass
+
+    lastWarning = None
+
+    def do_privmsg_notice(self, irc, msg):
+        channel = msg.args[0]
+        if not irc.isChannel(channel):
+            return
+
+    def doPrivmsg(self, irc, msg):
+        #if not callbacks.addressed(irc.nick, msg): #message is not direct command
+        self.do_privmsg_notice(irc, msg)
+
+        timestamp = getattr(msg, 'receivedAt', None)
+
+        if self.lastWarning is not None and timestamp - self.lastWarning < 22*60:
+            return
+
+        prefix = msg.prefix
+        prefixen = [ "themap", "the_map", "the-map", "xdotool" ]
+        found = False
+        for word in prefixen:
+            if word in prefix:
+                found = True
+
+        if found == False:
+            return
+
+        msgtime = datetime.fromtimestamp(timestamp - 10*60*60).time()
+        if msgtime >= time(05,00) or msgtime < time(01,10):
+            # not sleeping time for the map
+            return
+
+        channel = "##alezakos"
+
+        msgChannel = msg.args[0]
+        if msgChannel == "#sujevo" or msgChannel == "#sujevo-dev":
+            channel = msgChannel
+
+        message = "%s: it is too late, you shall go to bed!" % (msg.nick)
+        irc.queueMsg(ircmsgs.privmsg(channel, message))
+
+        self.lastWarning = timestamp
 
 
 Class = TheNap
